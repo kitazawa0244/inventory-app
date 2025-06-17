@@ -47,5 +47,31 @@ def add_post():
     conn.close()
     return redirect('/')
 
+#追加：在庫数を直接編集
+@app.route('/update/<int:item_id>/<string:action>')
+def update_quantity(item_id, action):
+    conn = sqlite3.connect('inventory.db')
+    c = conn.cursor()
+
+    c.execute('SELECT quantity FROM inventory WHERE id = ?', (item_id,))
+    row = c.fetchone()
+
+    if row is None:
+        conn.close()
+        return redirect('/')
+
+    quantity = row[0]
+
+    if action == 'increase':
+        quantity += 1
+    elif action == 'decrease' and quantity > 0:
+        quantity -= 1
+
+    c.execute('UPDATE inventory SET quantity = ? WHERE id = ?', (quantity, item_id))
+    conn.commit()
+    conn.close()
+    return redirect('/')
+
+
 if __name__ == '__main__':
     app.run(debug=True)

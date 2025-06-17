@@ -16,6 +16,8 @@
             <th>商品名</th>
             <th>カテゴリ</th>
             <th>在庫数</th>
+            <th>操作</th>
+
         </tr>
         {% for item in items %}
         <tr>
@@ -23,6 +25,11 @@
             <td>{{ item[1] }}</td>  {# items.name #}
             <td>{{ item[2] }}</td>  {# items.category #}
             <td>{{ item[3] }}</td>  {# inventory.quantity #}
+            <td>
+                <a href="/update/{{ item[0] }}/increase">＋</a>
+                <a href="/update/{{ item[0] }}/decrease">−</a>
+            </td>
+
         </tr>
         {% endfor %}
     </table>
