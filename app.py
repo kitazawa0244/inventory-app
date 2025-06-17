@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, request, redirect
 import sqlite3
 
 app = Flask(__name__)
@@ -17,10 +17,35 @@ def index():
         JOIN items ON inventory.item_id = items.id
     ''')
     items = c.fetchall()  # → list of tuples
-    print("==========")
-    print(items)
+    
     conn.close()
     return render_template('index.html', items=items)
+
+# ★ 追加：商品登録フォームの表示
+@app.route('/add')
+def add():
+    return render_template('add.html')
+
+# ★ 追加：フォームから商品を追加（POST）
+@app.route('/add', methods=['POST'])
+def add_post():
+    name = request.form['name']
+    category = request.form['category']
+    quantity = int(request.form['quantity'])
+
+    conn = sqlite3.connect('inventory.db')
+    c = conn.cursor()
+
+    # itemsテーブルに商品を追加
+    c.execute('INSERT INTO items (name, category) VALUES (?, ?)', (name, category))
+    item_id = c.lastrowid  # 最後に追加された商品のIDを取得
+
+    # inventoryテーブルに在庫数を登録
+    c.execute('INSERT INTO inventory (item_id, quantity) VALUES (?, ?)', (item_id, quantity))
+    
+    conn.commit()
+    conn.close()
+    return redirect('/')
 
 if __name__ == '__main__':
     app.run(debug=True)
