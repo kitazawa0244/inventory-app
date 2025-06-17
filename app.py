@@ -36,16 +36,27 @@ def add_post():
     conn = sqlite3.connect('inventory.db')
     c = conn.cursor()
 
-    # itemsテーブルに商品を追加
-    c.execute('INSERT INTO items (name, category) VALUES (?, ?)', (name, category))
-    item_id = c.lastrowid  # 最後に追加された商品のIDを取得
+    # 同じ商品名＋カテゴリがあるか確認
+    c.execute('SELECT id FROM items WHERE name = ? AND category = ?', (name, category))
+    item = c.fetchone()
 
-    # inventoryテーブルに在庫数を登録
-    c.execute('INSERT INTO inventory (item_id, quantity) VALUES (?, ?)', (item_id, quantity))
-    
+    if item:
+        # 既存商品があれば在庫を加算
+        item_id = item[0]
+        c.execute('SELECT quantity FROM inventory WHERE item_id = ?', (item_id,))
+        current_quantity = c.fetchone()[0]
+        new_quantity = current_quantity + quantity
+        c.execute('UPDATE inventory SET quantity = ? WHERE item_id = ?', (new_quantity, item_id))
+    else:
+        # なければ新規登録
+        c.execute('INSERT INTO items (name, category) VALUES (?, ?)', (name, category))
+        item_id = c.lastrowid
+        c.execute('INSERT INTO inventory (item_id, quantity) VALUES (?, ?)', (item_id, quantity))
+
     conn.commit()
     conn.close()
     return redirect('/')
+
 
 #追加：在庫数を直接編集
 @app.route('/update/<int:item_id>/<string:action>')
