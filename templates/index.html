@@ -17,6 +17,8 @@
             <th>カテゴリ</th>
             <th>在庫数</th>
             <th>操作</th>
+            <th>削除</th>
+
 
         </tr>
         {% for item in items %}
@@ -29,6 +31,10 @@
                 <a href="/update/{{ item[0] }}/increase">＋</a>
                 <a href="/update/{{ item[0] }}/decrease">−</a>
             </td>
+            <td>
+                <a href="/delete/{{ item[0] }}">削除</a>
+            </td>
+
 
         </tr>
         {% endfor %}

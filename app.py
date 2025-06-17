@@ -15,6 +15,7 @@ def index():
             inventory.quantity
         FROM inventory
         JOIN items ON inventory.item_id = items.id
+        WHERE items.delete_flag = 0      
     ''')
     items = c.fetchall()  # → list of tuples
     
@@ -82,6 +83,17 @@ def update_quantity(item_id, action):
     conn.commit()
     conn.close()
     return redirect('/')
+
+#追加：論理削除
+@app.route('/delete/<int:item_id>')
+def delete_item(item_id):
+    conn = sqlite3.connect('inventory.db')
+    c = conn.cursor()
+    c.execute('UPDATE items SET delete_flag = 1 WHERE id = ?', (item_id,))
+    conn.commit()
+    conn.close()
+    return redirect('/')
+
 
 
 if __name__ == '__main__':
