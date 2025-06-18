@@ -1,43 +1,31 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>在庫一覧</title>
-    <style>
-        table { border-collapse: collapse; width: 70%; margin: 2em auto; }
-        th, td { border: 1px solid #ccc; padding: 10px; text-align: center; }
-    </style>
-</head>
-<body>
-    <h2 style="text-align: center;">在庫一覧</h2>
-    <table>
-        <tr>
-            <th>ID</th>
-            <th>商品名</th>
-            <th>カテゴリ</th>
-            <th>在庫数</th>
-            <th>操作</th>
-            <th>削除</th>
+{% extends "base.html" %}
+{% block title %}在庫一覧{% endblock %}
 
-
-        </tr>
-        {% for item in items %}
-        <tr>
-            <td>{{ item[0] }}</td>  {# inventory.id #}
-            <td>{{ item[1] }}</td>  {# items.name #}
-            <td>{{ item[2] }}</td>  {# items.category #}
-            <td>{{ item[3] }}</td>  {# inventory.quantity #}
-            <td>
-                <a href="/update/{{ item[0] }}/increase">＋</a>
-                <a href="/update/{{ item[0] }}/decrease">−</a>
-            </td>
-            <td>
-                <a href="/delete/{{ item[0] }}">削除</a>
-            </td>
-
-
-        </tr>
-        {% endfor %}
-    </table>
-</body>
-</html>
+{% block content %}
+<h2 style="text-align: center;">在庫一覧</h2>
+<table>
+    <tr>
+        <th>ID</th>
+        <th>商品名</th>
+        <th>カテゴリ</th>
+        <th>在庫数</th>
+        <th>操作</th>
+        <th>削除</th>
+    </tr>
+    {% for item in items %}
+    <tr>
+        <td>{{ item[0] }}</td>  {# inventory.id #}
+        <td>{{ item[1] }}</td>  {# items.name #}
+        <td>{{ item[2] }}</td>  {# items.category #}
+        <td>{{ item[3] }}</td>  {# inventory.quantity #}
+        <td>
+            <a href="/update/{{ item[0] }}/increase">＋</a>
+            <a href="/update/{{ item[0] }}/decrease">−</a>
+        </td>
+        <td>
+            <a href="/delete/{{ item[0] }}">削除</a>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+{% endblock %}

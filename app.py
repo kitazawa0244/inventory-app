@@ -94,7 +94,30 @@ def delete_item(item_id):
     conn.close()
     return redirect('/')
 
+@app.route('/log')
+def view_log():
+    conn = sqlite3.connect('inventory.db')
+    c = conn.cursor()
+
+    c.execute('''
+        SELECT 
+            log_inventory.timestamp,
+            users.name,
+            log_inventory.action,
+            log_inventory.item_name,
+            log_inventory.category,
+            log_inventory.quantity,
+            log_inventory.note
+        FROM log_inventory
+        JOIN users ON log_inventory.user_id = users.id
+        ORDER BY log_inventory.timestamp DESC
+    ''')
+
+    logs = c.fetchall()
+    conn.close()
+    return render_template('log.html', logs=logs)
 
 
 if __name__ == '__main__':
     app.run(debug=True)
+
