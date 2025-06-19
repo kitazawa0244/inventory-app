@@ -1,7 +1,10 @@
-from flask import Flask, render_template, request, redirect
+from flask import Flask, render_template, request, redirect, session, url_for
+from werkzeug.security import check_password_hash
 import sqlite3
 
+
 app = Flask(__name__)
+app.secret_key = 'gFks@pLq93df!!Jdks09akLPiWz'
 
 @app.route('/')
 def index():
@@ -116,6 +119,48 @@ def view_log():
     logs = c.fetchall()
     conn.close()
     return render_template('log.html', logs=logs)
+
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        name = request.form['name']
+        password = request.form['password']
+        hashed_pw = generate_password_hash(password)
+
+        conn = sqlite3.connect('inventory.db')
+        c = conn.cursor()
+        c.execute('INSERT INTO users (name, password) VALUES (?, ?)', (name, hashed_pw))
+        conn.commit()
+        conn.close()
+
+        return redirect('/')
+
+    # GETのときはフォーム表示
+    return render_template('register.html')
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        name = request.form['name']
+        password = request.form['password']
+
+        conn = sqlite3.connect('inventory.db')
+        c = conn.cursor()
+        c.execute('SELECT id, password FROM users WHERE name = ?', (name,))
+        user = c.fetchone()
+        conn.close()
+
+        if user and check_password_hash(user[1], password):
+            session['user_id'] = user[0]
+            session['user_name'] = name
+            return redirect('/')
+        else:
+            return 'ログイン失敗〜！ユーザー名かパスワードがちがうっぽい！'
+
+    return render_template('login.html')
+
 
 
 if __name__ == '__main__':
