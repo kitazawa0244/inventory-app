@@ -19,6 +19,10 @@
         nav a:hover {
             text-decoration: underline;
         }
+        .auth a {
+        color: #ccc;
+        margin-left: 10px;
+        }
         main {
             padding: 2em;
         }
@@ -34,6 +38,16 @@
             <a href="/log">操作履歴</a>
             <a href="/add">在庫追加</a>
         </nav>
+         <!-- 🔥 ここがログイン・ログアウト表示の切り替えゾーン！ -->
+        <div class="auth">
+            {% if session.get('user_name') %}
+                ようこそ、{{ session['user_name'] }} さん！
+                <a href="/logout">ログアウト</a>
+            {% else %}
+                <a href="/login">ログイン</a>
+                <a href="/register">新規登録</a>
+            {% endif %}
+        </div>
     </header>
     <main>
         {% block content %}{% endblock %}

@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, session, url_for
-from werkzeug.security import check_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 
 
@@ -124,43 +124,53 @@ def view_log():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        name = request.form['name']
-        password = request.form['password']
-        hashed_pw = generate_password_hash(password)
+        name = request.form['name'].strip()
+        password = request.form['password'].strip()
+
+        print("📝 登録ユーザー名:", name)
+        print("📝 登録パスワード（平文）:", password)
 
         conn = sqlite3.connect('inventory.db')
         c = conn.cursor()
-        c.execute('INSERT INTO users (name, password) VALUES (?, ?)', (name, hashed_pw))
+
+        # パスワードを平文で保存（ハッシュしない）
+        c.execute('INSERT INTO users (name, password) VALUES (?, ?)', (name, password))
         conn.commit()
         conn.close()
 
-        return redirect('/')
+        return redirect('/login')  # 登録後にログイン画面へ
 
-    # GETのときはフォーム表示
     return render_template('register.html')
 
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        name = request.form['name']
-        password = request.form['password']
+        name = request.form['name'].strip()
+        password = request.form['password'].strip()
 
         conn = sqlite3.connect('inventory.db')
-        c = conn.cursor()
-        c.execute('SELECT id, password FROM users WHERE name = ?', (name,))
-        user = c.fetchone()
-        conn.close()
+        try:
+            c = conn.cursor()
+            c.execute('SELECT id, name, password FROM users WHERE name = ?', (name,))
+            user = c.fetchone()
+        finally:
+            conn.close()  # ←必ずcloseされる！
 
-        if user and check_password_hash(user[1], password):
+        if user and user[2] == password:
             session['user_id'] = user[0]
-            session['user_name'] = name
+            session['user_name'] = user[1]
             return redirect('/')
         else:
             return 'ログイン失敗〜！ユーザー名かパスワードがちがうっぽい！'
 
     return render_template('login.html')
 
+
+@app.route('/logout')
+def logout():
+    session.clear()  # ログイン情報を消す
+    return redirect('/login')  # ← ログアウト後にログイン画面へ飛ばす✨
 
 
 if __name__ == '__main__':
