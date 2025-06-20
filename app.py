@@ -2,10 +2,28 @@ from flask import Flask, render_template, request, redirect, session, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 from datetime import datetime
+from functools import wraps
+
 
 
 app = Flask(__name__)
 app.secret_key = 'gFks@pLq93df!!Jdks09akLPiWz'
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if session.get('user_role') != 'admin':
+            return 'アクセス権限がありません🙅‍♂️'
+        return f(*args, **kwargs)
+    return decorated_function
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 def insert_log(user_id, action, item_id, item_name, category, quantity, note=""):
     conn = sqlite3.connect('inventory.db')
@@ -21,6 +39,9 @@ def insert_log(user_id, action, item_id, item_name, category, quantity, note="")
 
 @app.route('/')
 def index():
+    if 'user_id' not in session:
+        return redirect('/login')  # ← ログインしてなければリダイレクト
+
     conn = sqlite3.connect('inventory.db')
     c = conn.cursor()
     c.execute('''
@@ -40,11 +61,16 @@ def index():
 
 # ★ 追加：商品登録フォームの表示
 @app.route('/add')
+@login_required
+@admin_required
 def add():
     return render_template('add.html')
 
+
 # ★ 追加：フォームから商品を追加（POST）
 @app.route('/add', methods=['POST'])
+@login_required
+@admin_required
 def add_post():
     name = request.form['name']
     category = request.form['category']
@@ -86,7 +112,10 @@ def add_post():
 
 
 @app.route('/update/<int:item_id>/<string:action>')
+@login_required
+@admin_required
 def update_quantity(item_id, action):
+    
     conn = sqlite3.connect('inventory.db')
     c = conn.cursor()
 
@@ -136,6 +165,8 @@ def update_quantity(item_id, action):
 
 # 追加：論理削除
 @app.route('/delete/<int:item_id>')
+@login_required
+@admin_required
 def delete_item(item_id):
     conn = sqlite3.connect('inventory.db')
     c = conn.cursor()
@@ -166,6 +197,8 @@ def delete_item(item_id):
 
 @app.route('/log')
 def view_log():
+    if 'user_id' not in session:
+        return redirect('/login')  # ← ログインしてなければリダイレクト
     conn = sqlite3.connect('inventory.db')
     c = conn.cursor()
 
@@ -192,6 +225,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    if 'user_id' not in session:
+        return redirect('/login')  # ← ログインしてなければリダイレクト
     if request.method == 'POST':
         name = request.form['name'].strip()
         password = request.form['password'].strip()
@@ -226,7 +261,7 @@ def login():
         conn = sqlite3.connect('inventory.db')
         try:
             c = conn.cursor()
-            c.execute('SELECT id, name, password FROM users WHERE name = ?', (name,))
+            c.execute('SELECT id, name, password,role FROM users WHERE name = ?', (name,))
             user = c.fetchone()
         finally:
             conn.close()
@@ -234,6 +269,7 @@ def login():
         if user and check_password_hash(user[2], password):
             session['user_id'] = user[0]
             session['user_name'] = user[1]
+            session['user_role'] = user[3]  # ← role をセッションに追加
             return redirect('/')
         else:
             return 'ログイン失敗〜！ユーザー名かパスワードがちがうっぽい！'
