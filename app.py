@@ -1,10 +1,23 @@
 from flask import Flask, render_template, request, redirect, session, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
+from datetime import datetime
 
 
 app = Flask(__name__)
 app.secret_key = 'gFks@pLq93df!!Jdks09akLPiWz'
+
+def insert_log(user_id, action, item_id, item_name, category, quantity, note=""):
+    conn = sqlite3.connect('inventory.db')
+    c = conn.cursor()
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    c.execute('''
+        INSERT INTO log_inventory (
+            timestamp, user_id, action, item_id, item_name, category, quantity, note
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (timestamp, user_id, action, item_id, item_name, category, quantity, note))
+    conn.commit()
+    conn.close()
 
 @app.route('/')
 def index():
@@ -59,15 +72,25 @@ def add_post():
 
     conn.commit()
     conn.close()
+
+    insert_log(
+        user_id=session.get('user_id'),
+        action='add',
+        item_id=item_id,
+        item_name=name,
+        category=category,
+        quantity=quantity,
+        note='新規登録' if not item else '在庫加算'
+    )
     return redirect('/')
 
 
-#追加：在庫数を直接編集
 @app.route('/update/<int:item_id>/<string:action>')
 def update_quantity(item_id, action):
     conn = sqlite3.connect('inventory.db')
     c = conn.cursor()
 
+    # 在庫数取得
     c.execute('SELECT quantity FROM inventory WHERE id = ?', (item_id,))
     row = c.fetchone()
 
@@ -77,25 +100,69 @@ def update_quantity(item_id, action):
 
     quantity = row[0]
 
+    # 数量更新
     if action == 'increase':
         quantity += 1
     elif action == 'decrease' and quantity > 0:
         quantity -= 1
 
     c.execute('UPDATE inventory SET quantity = ? WHERE id = ?', (quantity, item_id))
+
+    # 🔍 商品情報をここで取得（items.id, name, category）
+    c.execute('''
+        SELECT items.id, items.name, items.category 
+        FROM inventory 
+        JOIN items ON inventory.item_id = items.id 
+        WHERE inventory.id = ?
+    ''', (item_id,))
+    item_info = c.fetchone()
+
     conn.commit()
     conn.close()
+
+    # ✅ ログ記録（← item_info を使ってログ）
+    if item_info:
+        insert_log(
+            user_id=session.get('user_id'),
+            action='increase' if action == 'increase' else 'decrease',
+            item_id=item_info[0],
+            item_name=item_info[1],
+            category=item_info[2],
+            quantity=1,
+            note=''
+        )
+
     return redirect('/')
 
-#追加：論理削除
+# 追加：論理削除
 @app.route('/delete/<int:item_id>')
 def delete_item(item_id):
     conn = sqlite3.connect('inventory.db')
     c = conn.cursor()
+
+    # ✅ 商品情報を削除前に取得
+    c.execute('SELECT name, category FROM items WHERE id = ?', (item_id,))
+    item = c.fetchone()
+
+    # 論理削除実行
     c.execute('UPDATE items SET delete_flag = 1 WHERE id = ?', (item_id,))
     conn.commit()
     conn.close()
+
+    # ✅ ログ記録（削除）
+    if item:
+        insert_log(
+            user_id=session.get('user_id'),
+            action='delete',
+            item_id=item_id,
+            item_name=item[0],
+            category=item[1],
+            quantity=0,
+            note='論理削除'
+        )
+
     return redirect('/')
+
 
 @app.route('/log')
 def view_log():
@@ -121,24 +188,31 @@ def view_log():
     return render_template('log.html', logs=logs)
 
 
+from werkzeug.security import generate_password_hash, check_password_hash
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
         name = request.form['name'].strip()
         password = request.form['password'].strip()
 
-        print("📝 登録ユーザー名:", name)
-        print("📝 登録パスワード（平文）:", password)
+        # パスワードをハッシュ化
+        hashed_password = generate_password_hash(password)
 
         conn = sqlite3.connect('inventory.db')
         c = conn.cursor()
 
-        # パスワードを平文で保存（ハッシュしない）
-        c.execute('INSERT INTO users (name, password) VALUES (?, ?)', (name, password))
+        # 重複チェック（おすすめ）
+        c.execute('SELECT id FROM users WHERE name = ?', (name,))
+        if c.fetchone():
+            conn.close()
+            return 'このユーザー名はすでに使われています！'
+
+        c.execute('INSERT INTO users (name, password) VALUES (?, ?)', (name, hashed_password))
         conn.commit()
         conn.close()
 
-        return redirect('/login')  # 登録後にログイン画面へ
+        return redirect('/login')
 
     return render_template('register.html')
 
@@ -155,9 +229,9 @@ def login():
             c.execute('SELECT id, name, password FROM users WHERE name = ?', (name,))
             user = c.fetchone()
         finally:
-            conn.close()  # ←必ずcloseされる！
+            conn.close()
 
-        if user and user[2] == password:
+        if user and check_password_hash(user[2], password):
             session['user_id'] = user[0]
             session['user_name'] = user[1]
             return redirect('/')
@@ -174,5 +248,6 @@ def logout():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+      app.run(debug=True, threaded=False)
+
 
