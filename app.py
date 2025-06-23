@@ -72,26 +72,32 @@ def add():
 @login_required
 @admin_required
 def add_post():
-    name = request.form['name']
-    category = request.form['category']
+    name = request.form['name'].strip()
+    category = request.form['category'].strip()
     quantity = int(request.form['quantity'])
 
     conn = sqlite3.connect('inventory.db')
     c = conn.cursor()
 
-    # 同じ商品名＋カテゴリがあるか確認
-    c.execute('SELECT id FROM items WHERE name = ? AND category = ?', (name, category))
+    # 🔍 同じ商品名＋カテゴリのアイテムを探す（削除フラグも確認！）
+    c.execute('SELECT id, delete_flag FROM items WHERE name = ? AND category = ?', (name, category))
     item = c.fetchone()
 
     if item:
-        # 既存商品があれば在庫を加算
         item_id = item[0]
+
+        # 🌟 もし削除済みなら、復活させる！
+        if item[1] == 1:
+            c.execute('UPDATE items SET delete_flag = 0 WHERE id = ?', (item_id,))
+
+        # 📦 在庫を取得して加算
         c.execute('SELECT quantity FROM inventory WHERE item_id = ?', (item_id,))
         current_quantity = c.fetchone()[0]
         new_quantity = current_quantity + quantity
         c.execute('UPDATE inventory SET quantity = ? WHERE item_id = ?', (new_quantity, item_id))
+
     else:
-        # なければ新規登録
+        # 🆕 なければ新規登録
         c.execute('INSERT INTO items (name, category) VALUES (?, ?)', (name, category))
         item_id = c.lastrowid
         c.execute('INSERT INTO inventory (item_id, quantity) VALUES (?, ?)', (item_id, quantity))
@@ -99,6 +105,7 @@ def add_post():
     conn.commit()
     conn.close()
 
+    # ✍ ログ残すっしょ〜📒
     insert_log(
         user_id=session.get('user_id'),
         action='add',
@@ -108,7 +115,9 @@ def add_post():
         quantity=quantity,
         note='新規登録' if not item else '在庫加算'
     )
+
     return redirect('/')
+
 
 
 @app.route('/update/<int:item_id>/<string:action>')
@@ -171,16 +180,24 @@ def delete_item(item_id):
     conn = sqlite3.connect('inventory.db')
     c = conn.cursor()
 
-    # ✅ 商品情報を削除前に取得
+    # ✅ 商品情報ゲットだぜ〜
     c.execute('SELECT name, category FROM items WHERE id = ?', (item_id,))
     item = c.fetchone()
 
-    # 論理削除実行
+    # ✅ 削除前の在庫数も確認しておこ〜
+    c.execute('SELECT quantity FROM inventory WHERE item_id = ?', (item_id,))
+    quantity_row = c.fetchone()
+    deleted_quantity = quantity_row[0] if quantity_row else 0
+
+    # ✅ 在庫をゼロにしちゃう🎯
+    c.execute('UPDATE inventory SET quantity = 0 WHERE item_id = ?', (item_id,))
+
+    # ✅ 論理削除（delete_flagを1にする）
     c.execute('UPDATE items SET delete_flag = 1 WHERE id = ?', (item_id,))
     conn.commit()
     conn.close()
 
-    # ✅ ログ記録（削除）
+    # ✅ ログ記録（在庫があったらマイナスで残す📉）
     if item:
         insert_log(
             user_id=session.get('user_id'),
@@ -188,7 +205,7 @@ def delete_item(item_id):
             item_id=item_id,
             item_name=item[0],
             category=item[1],
-            quantity=0,
+            quantity=-deleted_quantity,  # ←ここがポイント💥
             note='論理削除'
         )
 
