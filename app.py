@@ -4,10 +4,16 @@ import sqlite3
 from datetime import datetime
 from functools import wraps
 
+app = Flask(__name__)
 
+import os
+from dotenv import load_dotenv
+
+load_dotenv()  # ← .envファイルを読み込む
 
 app = Flask(__name__)
-app.secret_key = 'gFks@pLq93df!!Jdks09akLPiWz'
+app.secret_key = os.getenv('SECRET_KEY')
+
 
 def admin_required(f):
     @wraps(f)
@@ -301,6 +307,6 @@ def logout():
 
 
 if __name__ == '__main__':
-      app.run(debug=True, threaded=False)
+      app.run(debug=False)
 
 
